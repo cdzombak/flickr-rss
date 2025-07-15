@@ -113,4 +113,4 @@ Each RSS feed includes:
 
 GNU General Public License v3.0
 
-![I believe in RSS!](./i believe in rss.png)
+![I believe in RSS](i believe in rss.png)
