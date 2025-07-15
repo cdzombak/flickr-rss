@@ -60,6 +60,9 @@ func (c *FlickrClient) GetUserPhotos(userID string, count int) ([]FlickrPhoto, e
 	perPage := 500 // Maximum allowed by Flickr API
 	page := 1
 	
+	// Use authenticated method if OAuth credentials are available
+	useAuth := c.credentials.OAuthToken != "" && c.credentials.OAuthTokenSecret != ""
+	
 	for len(allPhotos) < count {
 		// Calculate how many photos to request for this page
 		remaining := count - len(allPhotos)
@@ -67,7 +70,16 @@ func (c *FlickrClient) GetUserPhotos(userID string, count int) ([]FlickrPhoto, e
 			remaining = perPage
 		}
 		
-		photos, hasMore, err := c.getUserPhotosPage(userID, remaining, page)
+		var photos []FlickrPhoto
+		var hasMore bool
+		var err error
+		
+		if useAuth {
+			photos, hasMore, err = c.getUserPhotosPageAuth(userID, remaining, page)
+		} else {
+			photos, hasMore, err = c.getUserPhotosPagePublic(userID, remaining, page)
+		}
+		
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +102,7 @@ func (c *FlickrClient) GetUserPhotos(userID string, count int) ([]FlickrPhoto, e
 	return allPhotos, nil
 }
 
-func (c *FlickrClient) getUserPhotosPage(userID string, perPage, page int) ([]FlickrPhoto, bool, error) {
+func (c *FlickrClient) getUserPhotosPagePublic(userID string, perPage, page int) ([]FlickrPhoto, bool, error) {
 	baseURL := "https://api.flickr.com/services/rest/"
 	
 	params := url.Values{}
@@ -106,6 +118,97 @@ func (c *FlickrClient) getUserPhotosPage(userID string, perPage, page int) ([]Fl
 	reqURL := baseURL + "?" + params.Encode()
 	
 	resp, err := c.httpClient.Get(reqURL)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to make API request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, false, fmt.Errorf("API request failed with status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var flickrResp struct {
+		Photos struct {
+			Photo []FlickrPhoto `json:"photo"`
+			Page  int           `json:"page"`
+			Pages int           `json:"pages"`
+			Total interface{}   `json:"total"`
+		} `json:"photos"`
+		Stat    string `json:"stat"`
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	
+	if err := json.Unmarshal(body, &flickrResp); err != nil {
+		return nil, false, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	if flickrResp.Stat != "ok" {
+		if flickrResp.Message != "" {
+			return nil, false, fmt.Errorf("Flickr API error: %s (code %d)", flickrResp.Message, flickrResp.Code)
+		}
+		return nil, false, fmt.Errorf("Flickr API returned error status: %s", flickrResp.Stat)
+	}
+
+	hasMore := flickrResp.Photos.Page < flickrResp.Photos.Pages
+	return flickrResp.Photos.Photo, hasMore, nil
+}
+
+func (c *FlickrClient) getUserPhotosPageAuth(userID string, perPage, page int) ([]FlickrPhoto, bool, error) {
+	baseURL := "https://api.flickr.com/services/rest/"
+	
+	oauthParams := map[string]string{
+		"oauth_consumer_key":     c.credentials.APIKey,
+		"oauth_nonce":           c.generateNonce(),
+		"oauth_signature_method": "HMAC-SHA1",
+		"oauth_timestamp":       strconv.FormatInt(time.Now().Unix(), 10),
+		"oauth_token":           c.credentials.OAuthToken,
+		"oauth_version":         "1.0",
+	}
+
+	apiParams := map[string]string{
+		"method":        "flickr.people.getPhotos",
+		"format":        "json",
+		"nojsoncallback": "1",
+		"user_id":       userID,
+		"per_page":      strconv.Itoa(perPage),
+		"page":          strconv.Itoa(page),
+		"extras":        "description,date_taken,url_m,url_l,owner_name",
+	}
+
+	// Combine all parameters for signature
+	allParams := make(map[string]string)
+	for k, v := range oauthParams {
+		allParams[k] = v
+	}
+	for k, v := range apiParams {
+		allParams[k] = v
+	}
+
+	signature := c.generateSignature("GET", baseURL, allParams, c.credentials.OAuthTokenSecret)
+	oauthParams["oauth_signature"] = signature
+
+	authHeader := c.buildAuthHeader(oauthParams)
+
+	// Build URL with API parameters only
+	params := url.Values{}
+	for k, v := range apiParams {
+		params.Set(k, v)
+	}
+	reqURL := baseURL + "?" + params.Encode()
+	
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", authHeader)
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to make API request: %w", err)
 	}
