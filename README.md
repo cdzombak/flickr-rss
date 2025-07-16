@@ -143,6 +143,7 @@ Run them via, for example:
 ```shell
 docker run --rm cdzombak/flickr-rss:1 [OPTIONS]
 docker run --rm ghcr.io/cdzombak/flickr-rss:1 [OPTIONS]
+```
 
 ## License
 
