@@ -1,0 +1,6 @@
+-s dir
+--name flickr-rss
+--description "Generate an RSS feed of a Flickr photostream or your Flickr Friends & Family feed"
+--url "https://github.com/cdzombak/flickr-rss"
+--maintainer "Chris Dzombak <https://www.dzombak.com>"
+--license LGPL-3.0

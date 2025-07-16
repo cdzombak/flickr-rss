@@ -30,22 +30,32 @@ Each feed item includes an embedded image and RSS enclosure for the photo.`,
 		RunE:  runAuth,
 	}
 
+	versionCmd = &cobra.Command{
+		Use:   "version",
+		Short: "Print version information and exit",
+		RunE:  runVersion,
+	}
+
 	// Global flags
-	apiKey      string
-	apiSecret   string
-	oauthToken  string
-	oauthSecret string
-	credsFile   string
-	output      string
-	verbose     bool
-	saveCreds   string
+	apiKey        string
+	apiSecret     string
+	oauthToken    string
+	oauthSecret   string
+	credsFile     string
+	output        string
+	verbose       bool
+	saveCreds     string
 	friendsFamily bool
-	photoCount  int
+	photoCount    int
+
+	// injected at build time:
+	version string = "<dev>"
 )
 
 func init() {
 	rootCmd.AddCommand(generateCmd)
 	rootCmd.AddCommand(authCmd)
+	rootCmd.AddCommand(versionCmd)
 
 	// Global persistent flags
 	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "Flickr API key")
@@ -71,6 +81,11 @@ func main() {
 	}
 }
 
+func runVersion(_ *cobra.Command, _ []string) error {
+	fmt.Printf("flickr-rss %s\n", version)
+	return nil
+}
+
 func runGenerate(cmd *cobra.Command, args []string) error {
 	// Handle friends & family mode
 	if friendsFamily {
@@ -82,27 +97,27 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	userInput := args[0]
-	
+
 	// Load credentials
 	creds, err := loadCredsIfProvided()
 	if err != nil {
 		return fmt.Errorf("failed to load credentials: %w", err)
 	}
-	
+
 	if err := creds.Validate(); err != nil {
 		return fmt.Errorf("invalid credentials: %w", err)
 	}
-	
+
 	client := NewFlickrClient(creds)
-	
+
 	// Determine if userInput is a profile URL, username, or user ID
 	var userID string
 	var displayName string
-	
+
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Looking up user: %s\n", userInput)
 	}
-	
+
 	// Check if userInput is a Flickr profile URL
 	if isFlickrProfileURL(userInput) {
 		if verbose {
@@ -132,25 +147,25 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		userID = userInput
 		displayName = userInput
 	}
-	
+
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Using user ID: %s\n", userID)
 		fmt.Fprintf(os.Stderr, "Display name: %s\n", displayName)
 	}
-	
+
 	// Fetch latest photos
 	photos, err := client.GetUserPhotos(userID, photoCount)
 	if err != nil {
 		return fmt.Errorf("failed to fetch photos for user %s: %w", userID, err)
 	}
-	
+
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Found %d photos\n", len(photos))
 	}
-	
+
 	// Generate RSS feed
 	feed := GenerateRSSFeed(photos, displayName)
-	
+
 	// Output RSS feed
 	var writer io.Writer = os.Stdout
 	if output != "" {
@@ -160,12 +175,12 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		}
 		defer file.Close()
 		writer = file
-		
+
 		if verbose {
 			fmt.Fprintf(os.Stderr, "Writing RSS feed to: %s\n", output)
 		}
 	}
-	
+
 	return feed.WriteXML(writer)
 }
 
@@ -216,7 +231,7 @@ func runGenerateFriendsFamily(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load credentials: %w", err)
 	}
-	
+
 	if err := creds.Validate(); err != nil {
 		return fmt.Errorf("invalid credentials: %w", err)
 	}
@@ -225,13 +240,13 @@ func runGenerateFriendsFamily(cmd *cobra.Command, args []string) error {
 	if creds.OAuthToken == "" || creds.OAuthTokenSecret == "" {
 		return fmt.Errorf("friends & family feed requires OAuth authentication. Run 'flickr-rss auth' first")
 	}
-	
+
 	client := NewFlickrClient(creds)
-	
+
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Fetching friends & family photos...\n")
 	}
-	
+
 	// Fetch latest photos from friends & family (max 50 due to API limits)
 	requestCount := photoCount
 	if requestCount > 50 {
@@ -244,14 +259,14 @@ func runGenerateFriendsFamily(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch friends & family photos: %w", err)
 	}
-	
+
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Found %d photos from friends & family\n", len(photos))
 	}
-	
+
 	// Generate RSS feed
 	feed := GenerateRSSFeed(photos, "Friends & Family")
-	
+
 	// Output RSS feed
 	var writer io.Writer = os.Stdout
 	if output != "" {
@@ -261,11 +276,11 @@ func runGenerateFriendsFamily(cmd *cobra.Command, args []string) error {
 		}
 		defer file.Close()
 		writer = file
-		
+
 		if verbose {
 			fmt.Fprintf(os.Stderr, "Writing RSS feed to: %s\n", output)
 		}
 	}
-	
+
 	return feed.WriteXML(writer)
 }
