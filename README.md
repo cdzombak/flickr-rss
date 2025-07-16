@@ -1,28 +1,15 @@
 # flickr-rss
 
-Generate RSS feeds for Flickr photos. Create feeds from any user's public photos or your friends & family timeline.
+Generate an RSS feed of a Flickr user's photostream or your Flickr Friends & Family feed.
 
 ## Features
 
 - **User feeds**: Generate RSS feeds from any Flickr user's photos
   - **Public photos only** when using API key alone
-  - **Includes friends/family photos** when authenticated and you're in their network
+  - **Includes friends/family photos** if you're in their network (requires OAuth)
 - **Friends & family feeds**: Generate feeds from your friends & family timeline (requires OAuth)
-- **Profile URL support**: Use Flickr profile URLs directly (e.g., `https://www.flickr.com/photos/username/`)
-- **High-resolution images**: Uses large-size photos for both display and enclosures
-- **Customizable count**: Specify how many photos to include (supports hundreds for user feeds, up to 50 for friends & family)
-- **YAML credential management**: Store API keys and OAuth tokens in a config file
-- **Flexible output**: Output to stdout or save to file
-
-## Installation
-
-### Build from source
-
-```bash
-git clone https://github.com/cdzombak/flickr-rss.git
-cd flickr-rss
-make build
-```
+- **Clean, high-res output:** output RSS items contain the Large-size image only; the image is also attached as an RSS Enclosure
+- Output to stdout or save to file
 
 ## Usage
 
@@ -34,7 +21,7 @@ Generate RSS feeds from any Flickr user's photos:
 # Public photos only (API key sufficient)
 flickr-rss generate username -c creds.yml
 
-# Include friends/family photos (requires OAuth authentication)
+# Include friends/family photos (if you're their friend/family; requires OAuth authentication)
 flickr-rss generate username -c creds-with-oauth.yml
 
 # Using user ID or profile URL
@@ -48,42 +35,42 @@ flickr-rss generate username --count 100 -c creds.yml
 flickr-rss generate username -c creds.yml -o feed.xml
 ```
 
-**Note**: If you're authenticated (have OAuth tokens) and are friends/family with the user, their private photos shared with you will be included in the feed. Without authentication, only public photos are included.
+**Note**: If you're authenticated (have OAuth tokens) and are friends/family with the user, their private photos shared with you will be included in the feed. Without authentication, or if you're not in the target user's friends/family, only public photos are included.
 
 ### Friends & Family Feeds
 
 Generate feeds from your friends & family timeline (requires OAuth authentication):
 
 ```bash
-# Friends & family feed (max 50 photos)
+# Friends & family feed
 flickr-rss generate -ff -c creds.yml
 
-# Specify count for friends & family
+# Specify count for friends & family (max 50 photos)
 flickr-rss generate -ff --count 30 -c creds.yml
 ```
 
-### Authentication Setup
+### Authentication
 
 1. **Get API credentials**: Visit [Flickr App Garden](https://www.flickr.com/services/apps/create/) and create a non-commercial API key
 
-2. **Create credentials file**:
+2. **Create credentials file**, then stop here if you don't need OAuth creds:
 ```yaml
 # creds.yml
 api_key: your_api_key_here
 api_secret: your_api_secret_here
-oauth_token: your_oauth_token_here          # optional for user feeds, required for friends & family feeds
-oauth_token_secret: your_oauth_token_secret_here  # optional for user feeds, required for friends & family feeds
 ```
 
-3. **Authenticate for enhanced access**:
+3. **Authenticate via OAuth**:
 ```bash
-# Authenticate to access friends & family feeds and private photos in user feeds
+# Authenticate via OAuth to get your OAuth credentials:
 flickr-rss auth --api-key YOUR_API_KEY --api-secret YOUR_API_SECRET --save-creds creds.yml
 ```
 
-## Command Reference
+### Reference
 
-### `flickr-rss generate [username|userid|profile_url]`
+```
+flickr-rss generate [username|userid|profile_url]
+```
 
 Generate RSS feed for a Flickr user or friends & family timeline.
 
@@ -94,7 +81,9 @@ Generate RSS feed for a Flickr user or friends & family timeline.
 - `-o, --output`: Output file (default: stdout)
 - `-v, --verbose`: Verbose output
 
-### `flickr-rss auth`
+```
+flickr-rss auth
+```
 
 Authenticate with Flickr OAuth and save credentials.
 
@@ -103,14 +92,64 @@ Authenticate with Flickr OAuth and save credentials.
 - `--api-secret`: Flickr API secret
 - `--save-creds`: Save credentials to specified YAML file
 
-## RSS Feed Format
+## Installation
 
-Each RSS feed includes:
-- **Channel**: Feed title, description, and link
-- **Items**: One per photo with title, link, embedded image, description, date, and enclosure
+### macOS via Homebrew
+
+```shell
+brew install cdzombak/oss/flickr-rss
+```
+
+### Debian via apt repository
+
+[Install my Debian repository](https://www.dzombak.com/blog/2025/06/updated-instructions-for-installing-my-debian-package-repositories/) if you haven't already:
+
+```shell
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://dist.cdzombak.net/keys/dist-cdzombak-net.gpg -o /etc/apt/keyrings/dist-cdzombak-net.gpg
+sudo chmod 644 /etc/apt/keyrings/dist-cdzombak-net.gpg
+sudo mkdir -p /etc/apt/sources.list.d
+sudo curl -fsSL https://dist.cdzombak.net/cdzombak-oss.sources -o /etc/apt/sources.list.d/cdzombak-oss.sources
+sudo chmod 644 /etc/apt/sources.list.d/cdzombak-oss.sources
+sudo apt update
+```
+
+Then install `flickr-rss` via `apt-get`:
+
+```shell
+sudo apt-get install flickr-rss
+```
+
+### Manual installation from build artifacts
+
+Pre-built binaries for Linux and macOS on various architectures are downloadable from each [GitHub Release](https://github.com/cdzombak/flickr-rss/releases). Debian packages for each release are available as well.
+
+### Build and install locally
+
+```shell
+git clone https://github.com/cdzombak/flickr-rss.git
+cd flickr-rss
+make build
+
+cp out/flickr-rss $INSTALL_DIR
+```
+
+## Docker images
+
+Docker images are available for a variety of Linux architectures from [Docker Hub](https://hub.docker.com/r/cdzombak/flickr-rss) and [GHCR](https://github.com/cdzombak/dirshard/pkgs/container/flickr-rss). Images are based on the `scratch` image and are as small as possible.
+
+Run them via, for example:
+
+```shell
+docker run --rm cdzombak/flickr-rss:1 [OPTIONS]
+docker run --rm ghcr.io/cdzombak/flickr-rss:1 [OPTIONS]
 
 ## License
 
-GNU General Public License v3.0
+GNU General Public License v3.0; see [LICENSE](LICENSE) in this repository.
+
+## Author
+
+[Claude Code](https://www.anthropic.com/claude-code) wrote this code with management by Chris Dzombak ([dzombak.com](https://www.dzombak.com) / [github.com/cdzombak](https://www.github.com/cdzombak)).
 
 <br /><br />![I believe in RSS](i%20believe%20in%20rss.png)
