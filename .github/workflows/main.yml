@@ -310,7 +310,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Release to ${{ needs.meta.outputs.brewtap_owner }}/${{ needs.meta.outputs.brewtap_name }} tap
-        uses: Justintime50/homebrew-releaser@v1
+        uses: Justintime50/homebrew-releaser@v2
         with:
           homebrew_owner: ${{ needs.meta.outputs.brewtap_owner }}
           homebrew_tap: homebrew-${{ needs.meta.outputs.brewtap_name }}
@@ -325,7 +325,7 @@ jobs:
           target_linux_arm64: true
           version: v${{ needs.meta.outputs.bin_version }}
           install: 'bin.install "${{ needs.meta.outputs.bin_name }}"'
-          test: 'assert_match("${{ needs.meta.outputs.bin_version }}", shell_output("#{bin}/${{ needs.meta.outputs.bin_name }} -version"))'
+          test: 'assert_match("${{ needs.meta.outputs.bin_version }}", shell_output("#{bin}/${{ needs.meta.outputs.bin_name }} version"))'
 
   ntfy:
     name: Ntfy
