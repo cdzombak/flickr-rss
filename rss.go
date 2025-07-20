@@ -97,7 +97,9 @@ func generateItemDescription(photo FlickrPhoto) string {
 	// Add description if available
 	if photo.Description.Content != "" {
 		desc.WriteString("<br/><br/>")
-		desc.WriteString(html.EscapeString(photo.Description.Content))
+		// Don't escape HTML in description content since it may contain valid HTML tags like links
+		// The description will be wrapped in CDATA in the RSS feed
+		desc.WriteString(photo.Description.Content)
 	}
 
 	return desc.String()
@@ -161,7 +163,7 @@ func (feed *RSSFeed) WriteXML(w io.Writer) error {
 <description><![CDATA[%s]]></description>
 <pubDate>%s</pubDate>
 <guid>%s</guid>`,
-			item.Description, // Already HTML escaped in generateItemDescription
+			item.Description, // HTML content preserved, wrapped in CDATA
 			item.PubDate,
 			html.EscapeString(item.GUID)); err != nil {
 			return err
