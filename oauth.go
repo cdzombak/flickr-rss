@@ -40,10 +40,10 @@ func (c *OAuthClient) GetRequestToken() error {
 	params := map[string]string{
 		"oauth_callback":         "oob",
 		"oauth_consumer_key":     c.apiKey,
-		"oauth_nonce":           generateNonce(),
+		"oauth_nonce":            generateNonce(),
 		"oauth_signature_method": "HMAC-SHA1",
-		"oauth_timestamp":       strconv.FormatInt(time.Now().Unix(), 10),
-		"oauth_version":         "1.0",
+		"oauth_timestamp":        strconv.FormatInt(time.Now().Unix(), 10),
+		"oauth_version":          "1.0",
 	}
 
 	signature := c.generateSignature("GET", flickrRequestTokenURL, params, "")
@@ -97,12 +97,12 @@ func (c *OAuthClient) GetAuthorizationURL() string {
 func (c *OAuthClient) GetAccessToken(verifier string) (*Credentials, error) {
 	params := map[string]string{
 		"oauth_consumer_key":     c.apiKey,
-		"oauth_nonce":           generateNonce(),
+		"oauth_nonce":            generateNonce(),
 		"oauth_signature_method": "HMAC-SHA1",
-		"oauth_timestamp":       strconv.FormatInt(time.Now().Unix(), 10),
-		"oauth_token":           c.requestToken,
-		"oauth_verifier":        verifier,
-		"oauth_version":         "1.0",
+		"oauth_timestamp":        strconv.FormatInt(time.Now().Unix(), 10),
+		"oauth_token":            c.requestToken,
+		"oauth_verifier":         verifier,
+		"oauth_version":          "1.0",
 	}
 
 	signature := c.generateSignature("GET", flickrAccessTokenURL, params, c.tokenSecret)
@@ -147,9 +147,9 @@ func (c *OAuthClient) GetAccessToken(verifier string) (*Credentials, error) {
 	}
 
 	return &Credentials{
-		APIKey:          c.apiKey,
-		APISecret:       c.apiSecret,
-		OAuthToken:      accessToken,
+		APIKey:           c.apiKey,
+		APISecret:        c.apiSecret,
+		OAuthToken:       accessToken,
 		OAuthTokenSecret: accessTokenSecret,
 	}, nil
 }

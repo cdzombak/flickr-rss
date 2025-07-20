@@ -8,18 +8,18 @@ import (
 )
 
 type Credentials struct {
-	APIKey          string `yaml:"api_key"`
-	APISecret       string `yaml:"api_secret"`
-	OAuthToken      string `yaml:"oauth_token"`
+	APIKey           string `yaml:"api_key"`
+	APISecret        string `yaml:"api_secret"`
+	OAuthToken       string `yaml:"oauth_token"`
 	OAuthTokenSecret string `yaml:"oauth_token_secret"`
 }
 
 func loadCredsIfProvided() (*Credentials, error) {
 	if credsFile == "" {
 		return &Credentials{
-			APIKey:          apiKey,
-			APISecret:       apiSecret,
-			OAuthToken:      oauthToken,
+			APIKey:           apiKey,
+			APISecret:        apiSecret,
+			OAuthToken:       oauthToken,
 			OAuthTokenSecret: oauthSecret,
 		}, nil
 	}

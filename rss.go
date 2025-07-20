@@ -19,6 +19,7 @@ type RSSItem struct {
 	Title       string
 	Link        string
 	Description string
+	Author      string
 	PubDate     string
 	GUID        string
 	Enclosure   *RSSEnclosure
@@ -44,11 +45,12 @@ func GenerateRSSFeed(photos []FlickrPhoto, username string) *RSSFeed {
 		if photo.Owner != "" {
 			linkOwner = photo.Owner
 		}
-		
+
 		item := RSSItem{
 			Title:       photo.Title,
 			Link:        fmt.Sprintf("https://www.flickr.com/photos/%s/%s/", linkOwner, photo.ID),
 			Description: generateItemDescription(photo),
+			Author:      photo.Username,
 			PubDate:     formatPubDate(photo.DateTaken),
 			GUID:        photo.ID,
 		}
@@ -76,7 +78,7 @@ func GenerateRSSFeed(photos []FlickrPhoto, username string) *RSSFeed {
 
 func generateItemDescription(photo FlickrPhoto) string {
 	var desc strings.Builder
-	
+
 	// Use large image for display
 	imageURL := photo.URLLarge
 	if imageURL == "" {
@@ -84,20 +86,20 @@ func generateItemDescription(photo FlickrPhoto) string {
 		imageURL = photo.URL
 		if imageURL == "" {
 			// Final fallback to constructing URL from photo metadata
-			imageURL = fmt.Sprintf("https://farm%d.staticflickr.com/%s/%s_%s_m.jpg", 
+			imageURL = fmt.Sprintf("https://farm%d.staticflickr.com/%s/%s_%s_m.jpg",
 				photo.Farm, photo.Server, photo.ID, photo.Secret)
 		}
 	}
-	
-	desc.WriteString(fmt.Sprintf(`<img src="%s" alt="%s" />`, 
+
+	desc.WriteString(fmt.Sprintf(`<img src="%s" alt="%s" />`,
 		html.EscapeString(imageURL), html.EscapeString(photo.Title)))
-	
+
 	// Add description if available
 	if photo.Description.Content != "" {
 		desc.WriteString("<br/><br/>")
 		desc.WriteString(html.EscapeString(photo.Description.Content))
 	}
-	
+
 	return desc.String()
 }
 
@@ -106,13 +108,13 @@ func formatPubDate(dateTaken string) string {
 	if dateTaken == "" {
 		return time.Now().Format(time.RFC1123Z)
 	}
-	
+
 	// Parse the date
 	t, err := time.Parse("2006-01-02 15:04:05", dateTaken)
 	if err != nil {
 		return time.Now().Format(time.RFC1123Z)
 	}
-	
+
 	return t.Format(time.RFC1123Z)
 }
 
@@ -141,12 +143,24 @@ func (feed *RSSFeed) WriteXML(w io.Writer) error {
 		if _, err := fmt.Fprintf(w, `
 <item>
 <title>%s</title>
-<link>%s</link>
+<link>%s</link>`,
+			html.EscapeString(item.Title),
+			html.EscapeString(item.Link)); err != nil {
+			return err
+		}
+
+		// Add author if present
+		if item.Author != "" {
+			if _, err := fmt.Fprintf(w, `
+<author>%s</author>`, html.EscapeString(item.Author)); err != nil {
+				return err
+			}
+		}
+
+		if _, err := fmt.Fprintf(w, `
 <description><![CDATA[%s]]></description>
 <pubDate>%s</pubDate>
 <guid>%s</guid>`,
-			html.EscapeString(item.Title),
-			html.EscapeString(item.Link),
 			item.Description, // Already HTML escaped in generateItemDescription
 			item.PubDate,
 			html.EscapeString(item.GUID)); err != nil {

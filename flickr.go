@@ -59,52 +59,52 @@ func (c *FlickrClient) GetUserPhotos(userID string, count int) ([]FlickrPhoto, e
 	var allPhotos []FlickrPhoto
 	perPage := 500 // Maximum allowed by Flickr API
 	page := 1
-	
+
 	// Use authenticated method if OAuth credentials are available
 	useAuth := c.credentials.OAuthToken != "" && c.credentials.OAuthTokenSecret != ""
-	
+
 	for len(allPhotos) < count {
 		// Calculate how many photos to request for this page
 		remaining := count - len(allPhotos)
 		if remaining > perPage {
 			remaining = perPage
 		}
-		
+
 		var photos []FlickrPhoto
 		var hasMore bool
 		var err error
-		
+
 		if useAuth {
 			photos, hasMore, err = c.getUserPhotosPageAuth(userID, remaining, page)
 		} else {
 			photos, hasMore, err = c.getUserPhotosPagePublic(userID, remaining, page)
 		}
-		
+
 		if err != nil {
 			return nil, err
 		}
-		
+
 		allPhotos = append(allPhotos, photos...)
-		
+
 		// Stop if we have enough photos or no more pages
 		if len(allPhotos) >= count || !hasMore || len(photos) == 0 {
 			break
 		}
-		
+
 		page++
 	}
-	
+
 	// Trim to exact count requested
 	if len(allPhotos) > count {
 		allPhotos = allPhotos[:count]
 	}
-	
+
 	return allPhotos, nil
 }
 
 func (c *FlickrClient) getUserPhotosPagePublic(userID string, perPage, page int) ([]FlickrPhoto, bool, error) {
 	baseURL := "https://api.flickr.com/services/rest/"
-	
+
 	params := url.Values{}
 	params.Set("method", "flickr.people.getPublicPhotos")
 	params.Set("api_key", c.credentials.APIKey)
@@ -116,7 +116,7 @@ func (c *FlickrClient) getUserPhotosPagePublic(userID string, perPage, page int)
 	params.Set("extras", "description,date_taken,url_m,url_l,owner_name")
 
 	reqURL := baseURL + "?" + params.Encode()
-	
+
 	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to make API request: %w", err)
@@ -143,7 +143,7 @@ func (c *FlickrClient) getUserPhotosPagePublic(userID string, perPage, page int)
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 	}
-	
+
 	if err := json.Unmarshal(body, &flickrResp); err != nil {
 		return nil, false, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
@@ -161,24 +161,24 @@ func (c *FlickrClient) getUserPhotosPagePublic(userID string, perPage, page int)
 
 func (c *FlickrClient) getUserPhotosPageAuth(userID string, perPage, page int) ([]FlickrPhoto, bool, error) {
 	baseURL := "https://api.flickr.com/services/rest/"
-	
+
 	oauthParams := map[string]string{
 		"oauth_consumer_key":     c.credentials.APIKey,
-		"oauth_nonce":           c.generateNonce(),
+		"oauth_nonce":            c.generateNonce(),
 		"oauth_signature_method": "HMAC-SHA1",
-		"oauth_timestamp":       strconv.FormatInt(time.Now().Unix(), 10),
-		"oauth_token":           c.credentials.OAuthToken,
-		"oauth_version":         "1.0",
+		"oauth_timestamp":        strconv.FormatInt(time.Now().Unix(), 10),
+		"oauth_token":            c.credentials.OAuthToken,
+		"oauth_version":          "1.0",
 	}
 
 	apiParams := map[string]string{
-		"method":        "flickr.people.getPhotos",
-		"format":        "json",
+		"method":         "flickr.people.getPhotos",
+		"format":         "json",
 		"nojsoncallback": "1",
-		"user_id":       userID,
-		"per_page":      strconv.Itoa(perPage),
-		"page":          strconv.Itoa(page),
-		"extras":        "description,date_taken,url_m,url_l,owner_name",
+		"user_id":        userID,
+		"per_page":       strconv.Itoa(perPage),
+		"page":           strconv.Itoa(page),
+		"extras":         "description,date_taken,url_m,url_l,owner_name",
 	}
 
 	// Combine all parameters for signature
@@ -201,7 +201,7 @@ func (c *FlickrClient) getUserPhotosPageAuth(userID string, perPage, page int) (
 		params.Set(k, v)
 	}
 	reqURL := baseURL + "?" + params.Encode()
-	
+
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to create request: %w", err)
@@ -234,7 +234,7 @@ func (c *FlickrClient) getUserPhotosPageAuth(userID string, perPage, page int) (
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 	}
-	
+
 	if err := json.Unmarshal(body, &flickrResp); err != nil {
 		return nil, false, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
@@ -252,7 +252,7 @@ func (c *FlickrClient) getUserPhotosPageAuth(userID string, perPage, page int) (
 
 func (c *FlickrClient) FindUserByUsername(username string) (string, error) {
 	baseURL := "https://api.flickr.com/services/rest/"
-	
+
 	params := url.Values{}
 	params.Set("method", "flickr.people.findByUsername")
 	params.Set("api_key", c.credentials.APIKey)
@@ -261,7 +261,7 @@ func (c *FlickrClient) FindUserByUsername(username string) (string, error) {
 	params.Set("nojsoncallback", "1")
 
 	reqURL := baseURL + "?" + params.Encode()
-	
+
 	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to make API request: %w", err)
@@ -302,7 +302,7 @@ func (c *FlickrClient) FindUserByUsername(username string) (string, error) {
 
 func (c *FlickrClient) LookupUserByURL(profileURL string) (string, error) {
 	baseURL := "https://api.flickr.com/services/rest/"
-	
+
 	params := url.Values{}
 	params.Set("method", "flickr.urls.lookupUser")
 	params.Set("api_key", c.credentials.APIKey)
@@ -311,7 +311,7 @@ func (c *FlickrClient) LookupUserByURL(profileURL string) (string, error) {
 	params.Set("nojsoncallback", "1")
 
 	reqURL := baseURL + "?" + params.Encode()
-	
+
 	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to make API request: %w", err)
@@ -352,7 +352,7 @@ func (c *FlickrClient) LookupUserByURL(profileURL string) (string, error) {
 
 func (c *FlickrClient) GetUserInfo(userID string) (string, error) {
 	baseURL := "https://api.flickr.com/services/rest/"
-	
+
 	params := url.Values{}
 	params.Set("method", "flickr.people.getInfo")
 	params.Set("api_key", c.credentials.APIKey)
@@ -361,7 +361,7 @@ func (c *FlickrClient) GetUserInfo(userID string) (string, error) {
 	params.Set("nojsoncallback", "1")
 
 	reqURL := baseURL + "?" + params.Encode()
-	
+
 	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to make API request: %w", err)
@@ -407,25 +407,25 @@ func (c *FlickrClient) GetContactsPhotos(count int) ([]FlickrPhoto, error) {
 	if count > 50 {
 		count = 50
 	}
-	
+
 	baseURL := "https://api.flickr.com/services/rest/"
-	
+
 	oauthParams := map[string]string{
 		"oauth_consumer_key":     c.credentials.APIKey,
-		"oauth_nonce":           c.generateNonce(),
+		"oauth_nonce":            c.generateNonce(),
 		"oauth_signature_method": "HMAC-SHA1",
-		"oauth_timestamp":       strconv.FormatInt(time.Now().Unix(), 10),
-		"oauth_token":           c.credentials.OAuthToken,
-		"oauth_version":         "1.0",
+		"oauth_timestamp":        strconv.FormatInt(time.Now().Unix(), 10),
+		"oauth_token":            c.credentials.OAuthToken,
+		"oauth_version":          "1.0",
 	}
 
 	apiParams := map[string]string{
-		"method":        "flickr.photos.getContactsPhotos",
-		"format":        "json",
+		"method":         "flickr.photos.getContactsPhotos",
+		"format":         "json",
 		"nojsoncallback": "1",
-		"count":         strconv.Itoa(count),
-		"just_friends":  "1",
-		"extras":        "description,date_taken,url_m,url_l,owner_name",
+		"count":          strconv.Itoa(count),
+		"just_friends":   "1",
+		"extras":         "description,date_taken,url_m,url_l,owner_name",
 	}
 
 	// Combine all parameters for signature
@@ -448,7 +448,7 @@ func (c *FlickrClient) GetContactsPhotos(count int) ([]FlickrPhoto, error) {
 		params.Set(k, v)
 	}
 	reqURL := baseURL + "?" + params.Encode()
-	
+
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
