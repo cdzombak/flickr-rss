@@ -26,12 +26,12 @@ func loadCredsIfProvided() (*Credentials, error) {
 
 	data, err := os.ReadFile(credsFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read credentials file %s: %w", credsFile, err)
+		return nil, WrapFileIO(err, fmt.Sprintf("failed to read credentials file %s", credsFile))
 	}
 
 	var creds Credentials
 	if err := yaml.Unmarshal(data, &creds); err != nil {
-		return nil, fmt.Errorf("failed to parse credentials file %s: %w", credsFile, err)
+		return nil, WrapInputs(err, fmt.Sprintf("failed to parse credentials file %s", credsFile))
 	}
 
 	// Override with CLI flags if provided
@@ -54,11 +54,11 @@ func loadCredsIfProvided() (*Credentials, error) {
 func saveCredentials(creds *Credentials, filename string) error {
 	data, err := yaml.Marshal(creds)
 	if err != nil {
-		return fmt.Errorf("failed to marshal credentials: %w", err)
+		return WrapFileIO(err, "failed to marshal credentials")
 	}
 
 	if err := os.WriteFile(filename, data, 0600); err != nil {
-		return fmt.Errorf("failed to write credentials file %s: %w", filename, err)
+		return WrapFileIO(err, fmt.Sprintf("failed to write credentials file %s", filename))
 	}
 
 	return nil
@@ -66,10 +66,10 @@ func saveCredentials(creds *Credentials, filename string) error {
 
 func (c *Credentials) Validate() error {
 	if c.APIKey == "" {
-		return fmt.Errorf("API key is required")
+		return NewInputs("API key is required")
 	}
 	if c.APISecret == "" {
-		return fmt.Errorf("API secret is required")
+		return NewInputs("API secret is required")
 	}
 	return nil
 }

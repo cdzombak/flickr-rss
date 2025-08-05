@@ -54,37 +54,37 @@ func (c *OAuthClient) GetRequestToken() error {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", flickrRequestTokenURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return WrapFlickrAuth(err, "failed to create request")
 	}
 	req.Header.Set("Authorization", authHeader)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return WrapFlickrAuth(err, "failed to make request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed with status %d", resp.StatusCode)
+		return ClassifyFlickrError(resp.StatusCode, 0, fmt.Sprintf("request failed with status %d", resp.StatusCode))
 	}
 
 	body := make([]byte, 1024)
 	n, err := resp.Body.Read(body)
 	if err != nil && err.Error() != "EOF" {
-		return fmt.Errorf("failed to read response: %w", err)
+		return WrapFlickrAuth(err, "failed to read response")
 	}
 
 	responseData := string(body[:n])
 	values, err := url.ParseQuery(responseData)
 	if err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
+		return WrapFlickrAuth(err, "failed to parse response")
 	}
 
 	c.requestToken = values.Get("oauth_token")
 	c.tokenSecret = values.Get("oauth_token_secret")
 
 	if c.requestToken == "" || c.tokenSecret == "" {
-		return fmt.Errorf("failed to get request token from response: %s", responseData)
+		return NewFlickrAuth(fmt.Sprintf("failed to get request token from response: %s", responseData))
 	}
 
 	return nil
@@ -113,37 +113,37 @@ func (c *OAuthClient) GetAccessToken(verifier string) (*Credentials, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", flickrAccessTokenURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, WrapFlickrAuth(err, "failed to create request")
 	}
 	req.Header.Set("Authorization", authHeader)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, WrapFlickrAuth(err, "failed to make request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed with status %d", resp.StatusCode)
+		return nil, ClassifyFlickrError(resp.StatusCode, 0, fmt.Sprintf("request failed with status %d", resp.StatusCode))
 	}
 
 	body := make([]byte, 1024)
 	n, err := resp.Body.Read(body)
 	if err != nil && err.Error() != "EOF" {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, WrapFlickrAuth(err, "failed to read response")
 	}
 
 	responseData := string(body[:n])
 	values, err := url.ParseQuery(responseData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, WrapFlickrAuth(err, "failed to parse response")
 	}
 
 	accessToken := values.Get("oauth_token")
 	accessTokenSecret := values.Get("oauth_token_secret")
 
 	if accessToken == "" || accessTokenSecret == "" {
-		return nil, fmt.Errorf("failed to get access token from response: %s", responseData)
+		return nil, NewFlickrAuth(fmt.Sprintf("failed to get access token from response: %s", responseData))
 	}
 
 	return &Credentials{
@@ -208,7 +208,7 @@ func performOAuthFlow(apiKey, apiSecret string) (*Credentials, error) {
 
 	fmt.Println("Step 1: Getting request token...")
 	if err := client.GetRequestToken(); err != nil {
-		return nil, fmt.Errorf("failed to get request token: %w", err)
+		return nil, WrapFlickrAuth(err, "failed to get request token")
 	}
 
 	authURL := client.GetAuthorizationURL()
@@ -220,13 +220,13 @@ func performOAuthFlow(apiKey, apiSecret string) (*Credentials, error) {
 	verifier := strings.TrimSpace(scanner.Text())
 
 	if verifier == "" {
-		return nil, fmt.Errorf("verification code is required")
+		return nil, NewUsage("verification code is required")
 	}
 
 	fmt.Println("\nStep 3: Getting access token...")
 	creds, err := client.GetAccessToken(verifier)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get access token: %w", err)
+		return nil, WrapFlickrAuth(err, "failed to get access token")
 	}
 
 	fmt.Println("Authentication successful!")

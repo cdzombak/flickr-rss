@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"regexp"
 
+	ec "github.com/cdzombak/exitcode_go"
 	"github.com/spf13/cobra"
 )
 
@@ -77,7 +79,29 @@ func init() {
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+
+		// Set exit code based on error type
+		var exitCode int
+		switch {
+		case errors.Is(err, ErrFlickrAuth):
+			exitCode = ec.NoPermission
+		case errors.Is(err, ErrFlickrServer):
+			exitCode = ec.Unavailable
+		case errors.Is(err, ErrFlickrUsage):
+			exitCode = ec.Usage
+		case errors.Is(err, ErrFlickrAPI):
+			exitCode = ec.Failure
+		case errors.Is(err, ErrFileIO):
+			exitCode = ec.IOErr
+		case errors.Is(err, ErrInputs):
+			exitCode = ec.NotConfigured
+		case errors.Is(err, ErrUsage):
+			exitCode = ec.InvalidArgument
+		default:
+			exitCode = ec.Failure
+		}
+
+		os.Exit(exitCode)
 	}
 }
 
@@ -93,7 +117,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("username, user ID, or profile URL is required unless using -ff flag")
+		return NewUsage("username, user ID, or profile URL is required unless using -ff flag")
 	}
 
 	userInput := args[0]
@@ -101,11 +125,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	// Load credentials
 	creds, err := loadCredsIfProvided()
 	if err != nil {
-		return fmt.Errorf("failed to load credentials: %w", err)
+		return WrapInputs(err, "failed to load credentials")
 	}
 
 	if err := creds.Validate(); err != nil {
-		return fmt.Errorf("invalid credentials: %w", err)
+		return WrapInputs(err, "invalid credentials")
 	}
 
 	client := NewFlickrClient(creds)
@@ -125,7 +149,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		}
 		userID, err = client.LookupUserByURL(userInput)
 		if err != nil {
-			return fmt.Errorf("failed to lookup user from URL '%s': %w", userInput, err)
+			return WrapFlickrAPI(err, fmt.Sprintf("failed to lookup user from URL '%s'", userInput))
 		}
 		// Get the actual username for display purposes
 		displayName, err = client.GetUserInfo(userID)
@@ -139,7 +163,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		// Try to find user by username (if it contains non-numeric characters, likely a username)
 		userID, err = client.FindUserByUsername(userInput)
 		if err != nil {
-			return fmt.Errorf("failed to find user by username '%s': %w", userInput, err)
+			return WrapFlickrAPI(err, fmt.Sprintf("failed to find user by username '%s'", userInput))
 		}
 		displayName = userInput
 	} else {
@@ -156,7 +180,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	// Fetch latest photos
 	photos, err := client.GetUserPhotos(userID, photoCount)
 	if err != nil {
-		return fmt.Errorf("failed to fetch photos for user %s: %w", userID, err)
+		return WrapFlickrAPI(err, fmt.Sprintf("failed to fetch photos for user %s", userID))
 	}
 
 	if verbose {
@@ -171,7 +195,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	if output != "" {
 		file, err := os.Create(output)
 		if err != nil {
-			return fmt.Errorf("failed to create output file %s: %w", output, err)
+			return WrapFileIO(err, fmt.Sprintf("failed to create output file %s", output))
 		}
 		defer file.Close()
 		writer = file
@@ -200,18 +224,18 @@ func isFlickrProfileURL(urlStr string) bool {
 
 func runAuth(cmd *cobra.Command, args []string) error {
 	if apiKey == "" || apiSecret == "" {
-		return fmt.Errorf("API key and secret are required for authentication. Use --api-key and --api-secret flags")
+		return NewUsage("API key and secret are required for authentication. Use --api-key and --api-secret flags")
 	}
 
 	fmt.Println("Starting OAuth authentication...")
 	creds, err := performOAuthFlow(apiKey, apiSecret)
 	if err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
+		return WrapFlickrAuth(err, "authentication failed")
 	}
 
 	if saveCreds != "" {
 		if err := saveCredentials(creds, saveCreds); err != nil {
-			return fmt.Errorf("failed to save credentials: %w", err)
+			return WrapFileIO(err, "failed to save credentials")
 		}
 		fmt.Printf("Credentials saved to: %s\n", saveCreds)
 	} else {
@@ -229,16 +253,16 @@ func runGenerateFriendsFamily(cmd *cobra.Command, args []string) error {
 	// Load credentials
 	creds, err := loadCredsIfProvided()
 	if err != nil {
-		return fmt.Errorf("failed to load credentials: %w", err)
+		return WrapInputs(err, "failed to load credentials")
 	}
 
 	if err := creds.Validate(); err != nil {
-		return fmt.Errorf("invalid credentials: %w", err)
+		return WrapInputs(err, "invalid credentials")
 	}
 
 	// Verify OAuth credentials are present for friends & family access
 	if creds.OAuthToken == "" || creds.OAuthTokenSecret == "" {
-		return fmt.Errorf("friends & family feed requires OAuth authentication. Run 'flickr-rss auth' first")
+		return NewUsage("friends & family feed requires OAuth authentication. Run 'flickr-rss auth' first")
 	}
 
 	client := NewFlickrClient(creds)
@@ -257,7 +281,7 @@ func runGenerateFriendsFamily(cmd *cobra.Command, args []string) error {
 	}
 	photos, err := client.GetContactsPhotos(requestCount)
 	if err != nil {
-		return fmt.Errorf("failed to fetch friends & family photos: %w", err)
+		return WrapFlickrAPI(err, "failed to fetch friends & family photos")
 	}
 
 	if verbose {
@@ -272,7 +296,7 @@ func runGenerateFriendsFamily(cmd *cobra.Command, args []string) error {
 	if output != "" {
 		file, err := os.Create(output)
 		if err != nil {
-			return fmt.Errorf("failed to create output file %s: %w", output, err)
+			return WrapFileIO(err, fmt.Sprintf("failed to create output file %s", output))
 		}
 		defer file.Close()
 		writer = file

@@ -119,17 +119,17 @@ func (c *FlickrClient) getUserPhotosPagePublic(userID string, perPage, page int)
 
 	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to make API request: %w", err)
+		return nil, false, WrapFlickrAPI(err, "failed to make API request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, false, fmt.Errorf("API request failed with status %d", resp.StatusCode)
+		return nil, false, ClassifyFlickrError(resp.StatusCode, 0, fmt.Sprintf("API request failed with status %d", resp.StatusCode))
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to read response body: %w", err)
+		return nil, false, WrapFlickrAPI(err, "failed to read response body")
 	}
 
 	var flickrResp struct {
@@ -145,14 +145,14 @@ func (c *FlickrClient) getUserPhotosPagePublic(userID string, perPage, page int)
 	}
 
 	if err := json.Unmarshal(body, &flickrResp); err != nil {
-		return nil, false, fmt.Errorf("failed to parse JSON response: %w", err)
+		return nil, false, WrapFlickrAPI(err, "failed to parse JSON response")
 	}
 
 	if flickrResp.Stat != "ok" {
 		if flickrResp.Message != "" {
-			return nil, false, fmt.Errorf("Flickr API error: %s (code %d)", flickrResp.Message, flickrResp.Code)
+			return nil, false, ClassifyFlickrError(resp.StatusCode, flickrResp.Code, flickrResp.Message)
 		}
-		return nil, false, fmt.Errorf("Flickr API returned error status: %s", flickrResp.Stat)
+		return nil, false, NewFlickrAPI(fmt.Sprintf("Flickr API returned error status: %s", flickrResp.Stat))
 	}
 
 	hasMore := flickrResp.Photos.Page < flickrResp.Photos.Pages
@@ -204,23 +204,23 @@ func (c *FlickrClient) getUserPhotosPageAuth(userID string, perPage, page int) (
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to create request: %w", err)
+		return nil, false, WrapFlickrAPI(err, "failed to create request")
 	}
 	req.Header.Set("Authorization", authHeader)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to make API request: %w", err)
+		return nil, false, WrapFlickrAPI(err, "failed to make API request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, false, fmt.Errorf("API request failed with status %d", resp.StatusCode)
+		return nil, false, ClassifyFlickrError(resp.StatusCode, 0, fmt.Sprintf("API request failed with status %d", resp.StatusCode))
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to read response body: %w", err)
+		return nil, false, WrapFlickrAPI(err, "failed to read response body")
 	}
 
 	var flickrResp struct {
@@ -236,14 +236,14 @@ func (c *FlickrClient) getUserPhotosPageAuth(userID string, perPage, page int) (
 	}
 
 	if err := json.Unmarshal(body, &flickrResp); err != nil {
-		return nil, false, fmt.Errorf("failed to parse JSON response: %w", err)
+		return nil, false, WrapFlickrAPI(err, "failed to parse JSON response")
 	}
 
 	if flickrResp.Stat != "ok" {
 		if flickrResp.Message != "" {
-			return nil, false, fmt.Errorf("Flickr API error: %s (code %d)", flickrResp.Message, flickrResp.Code)
+			return nil, false, ClassifyFlickrError(resp.StatusCode, flickrResp.Code, flickrResp.Message)
 		}
-		return nil, false, fmt.Errorf("Flickr API returned error status: %s", flickrResp.Stat)
+		return nil, false, NewFlickrAPI(fmt.Sprintf("Flickr API returned error status: %s", flickrResp.Stat))
 	}
 
 	hasMore := flickrResp.Photos.Page < flickrResp.Photos.Pages
@@ -264,17 +264,17 @@ func (c *FlickrClient) FindUserByUsername(username string) (string, error) {
 
 	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to make API request: %w", err)
+		return "", WrapFlickrAPI(err, "failed to make API request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status %d", resp.StatusCode)
+		return "", ClassifyFlickrError(resp.StatusCode, 0, fmt.Sprintf("API request failed with status %d", resp.StatusCode))
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return "", WrapFlickrAPI(err, "failed to read response body")
 	}
 
 	var result struct {
@@ -287,14 +287,14 @@ func (c *FlickrClient) FindUserByUsername(username string) (string, error) {
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("failed to parse JSON response: %w", err)
+		return "", WrapFlickrAPI(err, "failed to parse JSON response")
 	}
 
 	if result.Stat != "ok" {
 		if result.Message != "" {
-			return "", fmt.Errorf("Flickr API error: %s (code %d)", result.Message, result.Code)
+			return "", ClassifyFlickrError(resp.StatusCode, result.Code, result.Message)
 		}
-		return "", fmt.Errorf("Flickr API returned error status: %s", result.Stat)
+		return "", NewFlickrAPI(fmt.Sprintf("Flickr API returned error status: %s", result.Stat))
 	}
 
 	return result.User.ID, nil
@@ -314,17 +314,17 @@ func (c *FlickrClient) LookupUserByURL(profileURL string) (string, error) {
 
 	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to make API request: %w", err)
+		return "", WrapFlickrAPI(err, "failed to make API request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status %d", resp.StatusCode)
+		return "", ClassifyFlickrError(resp.StatusCode, 0, fmt.Sprintf("API request failed with status %d", resp.StatusCode))
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return "", WrapFlickrAPI(err, "failed to read response body")
 	}
 
 	var result struct {
@@ -337,14 +337,14 @@ func (c *FlickrClient) LookupUserByURL(profileURL string) (string, error) {
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("failed to parse JSON response: %w", err)
+		return "", WrapFlickrAPI(err, "failed to parse JSON response")
 	}
 
 	if result.Stat != "ok" {
 		if result.Message != "" {
-			return "", fmt.Errorf("Flickr API error: %s (code %d)", result.Message, result.Code)
+			return "", ClassifyFlickrError(resp.StatusCode, result.Code, result.Message)
 		}
-		return "", fmt.Errorf("Flickr API returned error status: %s", result.Stat)
+		return "", NewFlickrAPI(fmt.Sprintf("Flickr API returned error status: %s", result.Stat))
 	}
 
 	return result.User.ID, nil
@@ -364,17 +364,17 @@ func (c *FlickrClient) GetUserInfo(userID string) (string, error) {
 
 	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to make API request: %w", err)
+		return "", WrapFlickrAPI(err, "failed to make API request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status %d", resp.StatusCode)
+		return "", ClassifyFlickrError(resp.StatusCode, 0, fmt.Sprintf("API request failed with status %d", resp.StatusCode))
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return "", WrapFlickrAPI(err, "failed to read response body")
 	}
 
 	var result struct {
@@ -389,14 +389,14 @@ func (c *FlickrClient) GetUserInfo(userID string) (string, error) {
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("failed to parse JSON response: %w", err)
+		return "", WrapFlickrAPI(err, "failed to parse JSON response")
 	}
 
 	if result.Stat != "ok" {
 		if result.Message != "" {
-			return "", fmt.Errorf("Flickr API error: %s (code %d)", result.Message, result.Code)
+			return "", ClassifyFlickrError(resp.StatusCode, result.Code, result.Message)
 		}
-		return "", fmt.Errorf("Flickr API returned error status: %s", result.Stat)
+		return "", NewFlickrAPI(fmt.Sprintf("Flickr API returned error status: %s", result.Stat))
 	}
 
 	return result.Person.Username.Content, nil
@@ -451,35 +451,35 @@ func (c *FlickrClient) GetContactsPhotos(count int) ([]FlickrPhoto, error) {
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, WrapFlickrAPI(err, "failed to create request")
 	}
 	req.Header.Set("Authorization", authHeader)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make API request: %w", err)
+		return nil, WrapFlickrAPI(err, "failed to make API request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status %d", resp.StatusCode)
+		return nil, ClassifyFlickrError(resp.StatusCode, 0, fmt.Sprintf("API request failed with status %d", resp.StatusCode))
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, WrapFlickrAPI(err, "failed to read response body")
 	}
 
 	var flickrResp FlickrResponse
 	if err := json.Unmarshal(body, &flickrResp); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+		return nil, WrapFlickrAPI(err, "failed to parse JSON response")
 	}
 
 	if flickrResp.Stat != "ok" {
 		if flickrResp.Message != "" {
-			return nil, fmt.Errorf("Flickr API error: %s (code %d)", flickrResp.Message, flickrResp.Code)
+			return nil, ClassifyFlickrError(resp.StatusCode, flickrResp.Code, flickrResp.Message)
 		}
-		return nil, fmt.Errorf("Flickr API returned error status: %s", flickrResp.Stat)
+		return nil, NewFlickrAPI(fmt.Sprintf("Flickr API returned error status: %s", flickrResp.Stat))
 	}
 
 	return flickrResp.Photos.Photo, nil
