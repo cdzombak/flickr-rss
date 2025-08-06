@@ -98,9 +98,6 @@ func ClassifyFlickrError(statusCode int, errorCode int, message string) error {
 				return NewFlickrUsage(message)
 			}
 		}
-		if errorCode >= 500 && errorCode < 600 {
-			return NewFlickrServer(message)
-		}
-		return NewFlickrAPI(message)
+		return NewFlickrServer(message)
 	}
 }
