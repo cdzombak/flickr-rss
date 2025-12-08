@@ -4,7 +4,7 @@ go 1.24.4
 
 require (
 	github.com/cdzombak/exitcode_go v0.0.2
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v2 v2.4.0
 )
 
